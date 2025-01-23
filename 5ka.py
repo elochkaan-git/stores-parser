@@ -96,15 +96,6 @@ def database_writer(queue: multiprocessing.Queue) -> None:
     connection.close()
 
 
-# def products_counter(driver: webdriver.Firefox, urls: typing.Dict[str, str]) -> int:
-#     counter = 0
-#     for index, url in urls.items():
-#         driver.get(url)
-#         soup = bs(driver.page_source, 'html.parser')
-#         counter += len(soup.select("[class*='akn2Ylc1S bkn2Ylc1S']"))
-#     return counter
-
-
 def adress_setup(adress: str, driver: webdriver.Firefox) -> None:
     driver.get("https://5ka.ru/catalog/")
 
