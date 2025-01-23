@@ -16,7 +16,6 @@ import traceback
 import sys
 
 start = time.time()
-log = logging.getLogger('parser_logger')
 def logger_initialization(logger: logging.Logger) -> None:
     logger.setLevel(logging.DEBUG)
     
@@ -170,9 +169,10 @@ def main(urls: list[str]) -> typing.Tuple[str, float, str, float, float, str, st
 
 
 if __name__ == "__main__":
+    log = logging.getLogger('parser_logger')
     logger_initialization(log)
     number_of_processes = int(sys.argv[1])
-    urls = split_list(load_urls('urls1.json'), number_of_processes)
+    urls = split_list(load_urls(sys.argv[2]), number_of_processes)
     queue = multiprocessing.Queue()
 
     dbwriter = multiprocessing.Process(target=database_writer, args=(queue,))
