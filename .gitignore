@@ -8,3 +8,4 @@ parser.log
 pyvenv.cfg
 test.py
 products.db-journal
+.vscode
