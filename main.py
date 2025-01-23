@@ -89,17 +89,9 @@ def database_writer(queue: multiprocessing.Queue) -> None:
                       VALUES (?, ?, ?, ?, ?, ?, ?)''', data)
 
     log.info('Все изменения в таблице сохранены')
+    cursor.close()
     connection.commit()
     connection.close()
-
-
-# def products_counter(driver: webdriver.Firefox, urls: typing.Dict[str, str]) -> int:
-#     counter = 0
-#     for index, url in urls.items():
-#         driver.get(url)
-#         soup = bs(driver.page_source, 'html.parser')
-#         counter += len(soup.select("[class*='akn2Ylc1S bkn2Ylc1S']"))
-#     return counter
 
 
 def adress_setup(adress: str, driver: webdriver.Firefox) -> None:
@@ -119,14 +111,16 @@ def adress_setup(adress: str, driver: webdriver.Firefox) -> None:
         ec.element_to_be_clickable((By.XPATH, '//button[@class="atLAAl6Nb gtLAAl6Nb"]'))
     ).click()
 
-    log.info('Адрес установлен')
+    log.info(f'Адрес установлен для браузера в процессе {multiprocessing.current_process().pid}')
 
 
 def scraping(driver: webdriver.Firefox, urls: typing.Dict[str, str]) -> typing.Tuple[str, float, str, float, float, str, str]:
     log.info('Начинаем обрабатывать страницы')
+    log.debug(f'Текущий адрес: {driver.find_element(By.XPATH, '//span[@class="loFy5xub4 WoFy5xub4 coFy5xub4"]').text + \
+                                    driver.find_element(By.XPATH, '//span[@class="loFy5xub4 dXjHckwsA WoFy5xub4"]').text}')
     for url in urls:
+        log.debug(f'Процесс {multiprocessing.current_process().pid} обрабатывает {url}')
         driver.get(url)
-        log.debug(f'Обработка {url}')
         soup = bs(driver.page_source, 'html.parser')
 
         for item in soup.select("[class*='akn2Ylc1S bkn2Ylc1S']"):
@@ -148,24 +142,22 @@ def scraping(driver: webdriver.Firefox, urls: typing.Dict[str, str]) -> typing.T
             yield (name, value, unit, rating, cost, link, "Ярче!")
 
 
-def main(urls: list[str]) -> typing.Tuple[str, float, str, float, float, str, str]:
+def main(args: typing.Tuple[list[str], str]) -> typing.Tuple[str, float, str, float, float, str, str]:
     log.info('Программа запускается')
     results = []
     try:
         browser = driver_initialization()
-        adress_setup('Томск, Учебная улица, 42', browser)
-        for action in scraping(browser, urls):
+        adress_setup(args[1], browser)
+        for action in scraping(browser, args[0]):
             results.append(action)
-    except Exception as e:
-        log.error('Веб-драйвер отключен, база данных отключена. Программа завершила работу с ошибкой')
-        log.error(e)
+    except:
+        log.error(f'Браузер отключен, процесс {multiprocessing.current_process().pid} завершен с ошибкой')
         log.error(traceback.format_exc())
         browser.quit()
     else:
         browser.quit()
-        log.info('Веб-драйвер отключен, база данных отключена. Программа успешно завершила работу')
+        log.info(f'Браузер отключен, процесс {multiprocessing.current_process().pid} завершен без ошибок')
         return results
-
 
 
 if __name__ == "__main__":
@@ -178,11 +170,12 @@ if __name__ == "__main__":
     dbwriter = multiprocessing.Process(target=database_writer, args=(queue,))
     dbwriter.start()
 
+    args = [(part_of_urls, sys.argv[3]) for part_of_urls in urls]
     with multiprocessing.Pool(processes=number_of_processes) as pool:
-        for result in pool.imap(main, urls):
+        for result in pool.imap(main, args):
             for value in result:
                 queue.put(value)
 
     queue.put(None)
     dbwriter.join()
-    log.info(f"Время выполнения составило {time.time() - start - 5} секунд")
+    log.info(f"Время выполнения составило {time.time() - start} секунд")
