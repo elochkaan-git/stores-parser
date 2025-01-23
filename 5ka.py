@@ -173,17 +173,16 @@ def scraping(driver: webdriver.Firefox, urls: typing.List[str]) -> typing.Tuple[
             yield (name, value, unit, rating, cost, link, "Пятерочка")
 
 
-def main(urls: list[str]) -> typing.Tuple[str, float, str, float, float, str, str]:
+def main(urls: list[str], adress: str) -> typing.Tuple[str, float, str, float, float, str, str]:
     log.info(f'Запуск процесса {multiprocessing.current_process().pid}')
     results = []
     try:
         browser = driver_initialization()
-        adress_setup('Томск, Красноармейская улица, 114', browser)
-        for action in scraping(browser, urls):
+        adress_setup(args[1], browser)
+        for action in scraping(browser, args[0]):
             results.append(action)
-    except Exception as e:
+    except:
         log.error(f'Браузер отключен, процесс {multiprocessing.current_process().pid} завершен с ошибкой')
-        log.error(e)
         log.error(traceback.format_exc())
         browser.quit()
     else:
@@ -203,14 +202,12 @@ if __name__ == "__main__":
     dbwriter = multiprocessing.Process(target=database_writer, args=(queue,))
     dbwriter.start()
 
+    args = [(part_of_urls, sys.argv[3]) for part_of_urls in urls]
     with multiprocessing.Pool(processes=number_of_processes) as pool:
-        for result in pool.imap(main, urls):
+        for result in pool.imap(main, args):
             for value in result:
                 queue.put(value)
 
-    # with multiprocessing.Pool(processes=1) as pool:
-    #     pool.map(main, ['test_urls.json'])
-
     queue.put(None)
     dbwriter.join()
-    log.info(f"Время выполнения программы составило {time.time() - start} секунд")
+    log.info(f"Время выполнения составило {time.time() - start} секунд")
