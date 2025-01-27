@@ -52,22 +52,22 @@ def split_list(lst, n):
 
 
 def driver_initialization() -> webdriver.Firefox:
-    log.info('Начинаем запускать браузер')
+    log.info(f'В процессе {multiprocessing.current_process().pid} запускается браузер')
     driver_options = Options()
     driver_options.add_argument("--headless")
     driver_service = Service(executable_path="/usr/bin/geckodriver")
     driver = webdriver.Firefox(options=driver_options, service=driver_service)
-    log.info('Браузер настроен и готов к работе')
+    log.info(f'Браузер настроен и запущен в процессе {multiprocessing.current_process().pid}')
     return driver
 
 
-def database_writer(queue: multiprocessing.Queue) -> None:
+def database_writer(queue: multiprocessing.Queue, name_of_table: str) -> None:
     connection = sqlite3.connect("products.db")
     cursor = connection.cursor()
     log.info('Успешные подключение к базе данных и инициализация курсора')
 
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS Products (
+    cursor.execute(f'''
+    CREATE TABLE IF NOT EXISTS {name_of_table} (
     name TEXT NOT NULL,
     amount REAL,
     unit TEXT,
@@ -77,7 +77,7 @@ def database_writer(queue: multiprocessing.Queue) -> None:
     store TEXT
     )
     ''')
-    cursor.execute('DELETE FROM Products')
+    cursor.execute(f'DELETE FROM {name_of_table}')
     log.info('Таблица успешно создана')
     
     while True:
@@ -85,7 +85,7 @@ def database_writer(queue: multiprocessing.Queue) -> None:
         if data is None:
             log.info('Все данные занесены в таблицу')
             break
-        cursor.execute('''INSERT INTO Products (name, amount, unit, rating, cost, link, store) 
+        cursor.execute(f'''INSERT INTO {name_of_table} (name, amount, unit, rating, cost, link, store) 
                       VALUES (?, ?, ?, ?, ?, ?, ?)''', data)
 
     log.info('Все изменения в таблице сохранены')
@@ -104,7 +104,7 @@ def adress_setup(adress: str, driver: webdriver.Firefox) -> None:
     address_input = WebDriverWait(driver, 20).until(
         ec.presence_of_element_located((By.XPATH, '//*[@id="receivedAddress"]'))
     )
-    address_input.send_keys('Томск, Учебная улица, 42')
+    address_input.send_keys(adress)
     address_input.send_keys(Keys.ENTER)
 
     WebDriverWait(driver, 20).until(
@@ -116,30 +116,37 @@ def adress_setup(adress: str, driver: webdriver.Firefox) -> None:
 
 def scraping(driver: webdriver.Firefox, urls: typing.Dict[str, str]) -> typing.Tuple[str, float, str, float, float, str, str]:
     log.info('Начинаем обрабатывать страницы')
-    log.debug(f'Текущий адрес: {driver.find_element(By.XPATH, '//span[@class="loFy5xub4 WoFy5xub4 coFy5xub4"]').text + \
-                                    driver.find_element(By.XPATH, '//span[@class="loFy5xub4 dXjHckwsA WoFy5xub4"]').text}')
+    WebDriverWait(driver, 20).until(
+        ec.presence_of_element_located((By.XPATH, '//*[@class="loFy5xub4 WoFy5xub4 coFy5xub4"]'))
+    )
+    log.debug(f'Текущий адрес: {driver.find_element(By.XPATH, '//*[@class="loFy5xub4 WoFy5xub4 coFy5xub4"]').text + \
+                                driver.find_element(By.XPATH, '//*[@class="loFy5xub4 dXjHckwsA WoFy5xub4"]').text}')
     for url in urls:
-        log.debug(f'Процесс {multiprocessing.current_process().pid} обрабатывает {url}')
-        driver.get(url)
-        soup = bs(driver.page_source, 'html.parser')
+        try:
+            log.debug(f'Процесс {multiprocessing.current_process().pid} обрабатывает {url}')
+            driver.get(url)
+            soup = bs(driver.page_source, 'html.parser')
 
-        for item in soup.select("[class*='akn2Ylc1S bkn2Ylc1S']"):
-            name = item.find("div", class_="doFy5xub4 jkn2Ylc1S ToFy5xub4 bBoFy5xub4 coFy5xub4").text
-            value, unit = float(item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').rsplit(' ', 1)[0]),\
-                          item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').rsplit(' ', 1)[1]
+            for item in soup.select("[class*='akn2Ylc1S bkn2Ylc1S']"):
+                name = item.find("div", class_="doFy5xub4 jkn2Ylc1S ToFy5xub4 bBoFy5xub4 coFy5xub4").text
+                value, unit = float(item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').rsplit(' ', 1)[0]),\
+                            item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').rsplit(' ', 1)[1]
 
-            if unit in ['г', 'мл']:
-                value, unit = value / 1000, 'кг' if unit == 'г' else 'л'
+                if unit in ['г', 'мл']:
+                    value, unit = value / 1000, 'кг' if unit == 'г' else 'л'
 
-            link = "https://yarcheplus.ru" + item.find("a", class_="lkn2Ylc1S").get('href')
-            try:
-                rating = item.find("div", class_="ioFy5xub4 e773bOrUb UoFy5xub4 bAoFy5xub4 noFy5xub4 aoFy5xub4").text
-            except:
-                rating = None
-            cost = item.select("[class*='cwDg02i5o LoFy5xub4 byoFy5xub4 aoFy5xub4']")[0].text
+                link = "https://yarcheplus.ru" + item.find("a", class_="lkn2Ylc1S").get('href')
+                try:
+                    rating = item.find("div", class_="ioFy5xub4 e773bOrUb UoFy5xub4 bAoFy5xub4 noFy5xub4 aoFy5xub4").text
+                except:
+                    rating = None
+                cost = item.select("[class*='cwDg02i5o LoFy5xub4 byoFy5xub4 aoFy5xub4']")[0].text
 
-            log.debug(f'{(name, value, unit, rating, cost, link, "Ярче!")} переданы в базу данных')
-            yield (name, value, unit, rating, cost, link, "Ярче!")
+                log.debug(f'{(name, value, unit, rating, cost, link, "Ярче!")} переданы в базу данных')
+                yield (name, value, unit, rating, cost, link, "Ярче!")
+        except:
+            log.error(f'В процессе {multiprocessing.current_process().pid} возникла ошибка при обработке {url}')
+            log.error(traceback.format_exc())
 
 
 def main(args: typing.Tuple[list[str], str]) -> typing.Tuple[str, float, str, float, float, str, str]:
@@ -167,7 +174,7 @@ if __name__ == "__main__":
     urls = split_list(load_urls(sys.argv[2]), number_of_processes)
     queue = multiprocessing.Queue()
 
-    dbwriter = multiprocessing.Process(target=database_writer, args=(queue,))
+    dbwriter = multiprocessing.Process(target=database_writer, args=(queue, sys.argv[4],))
     dbwriter.start()
 
     args = [(part_of_urls, sys.argv[3]) for part_of_urls in urls]
