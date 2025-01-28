@@ -7,6 +7,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from bs4 import BeautifulSoup as bs
+from rich.console import Console
+from rich.table import Table
 import sqlite3
 import typing
 import json
@@ -172,7 +174,7 @@ def main(args: typing.Tuple[list[str], str]) -> typing.Tuple[str, float, str, fl
 
 
 def start_processes(options: list[int, str, str, str]) -> None:
-    number_of_processes = options[0]
+    number_of_processes = int(options[0])
     urls = split_list(load_urls(options[1]), number_of_processes)
     queue = multiprocessing.Queue()
 
@@ -191,14 +193,62 @@ def start_processes(options: list[int, str, str, str]) -> None:
 
 
 def menu() -> list[int, str, str, str]:
-    
-    options = [1, '', '', 'Products']
 
-    os.system('clear')
-    options[0] = int(prompt('Введите количество процессов (по умолчанию 1): ')) # Number of processes
-    options[1] = prompt('Введите путь до ссылок: ') # Path to urls
-    options[2] = prompt('Введите адрес магазина: ') # Adress of store
-    options[3] = prompt('Введите название таблицы в базе данных, в которую хотите сохранить продукты: ') # Name of table in db
+    console = Console()
+
+    table = Table(title='Выбор магазина для парсинга (введите q для выхода)',
+                  show_lines=True)
+    table.add_column('Номер')
+    table.add_column('Название')
+    table.add_column('Параметры запуска по умолчанию')
+
+    table.add_row('1', 'Ярче', f'''Количество процессов: 3
+Путь до ссылок: {os.getcwd() + "/urls1.json"}
+Адрес магазина: {None}
+Название таблицы: Products_yarcheplus''')
+    table.add_row('2', 'Пятерочка', f'''Количество процессов: 3
+Путь до ссылок: {os.getcwd() + "/test_urls1.json"}
+Адрес магазина: {None}
+Название таблицы: Products_5ka''')
+
+    while True:
+        console.clear()
+        console.print(table)
+        store = prompt('Какой магазин выбираем? (введите номер): ')
+
+        options = []
+        if store == 'q':
+            sys.exit()
+        elif int(store) == 1:
+            options = [3, './urls1.json', '', 'Products_yarcheplus']
+        elif int(store) == 2:
+            options = [3, './test_urls1.json', '', 'Products_5ka']
+
+        is_default = prompt('Хотите изменить базовые настройки? (ввести адрес магазина можно будет при любом ответе) [y/n]: ')
+        if is_default.lower() == 'y':
+            answer = prompt('Введите количество процессов (по умолчанию 1): ') # Number of processes
+            if answer != '':
+                options[0] = answer
+
+            answer = prompt('Введите путь до ссылок: ') # Path to urls
+            if answer != '':
+                options[1] = answer
+
+            answer = prompt('Введите адрес магазина: ') # Adress of store
+            if answer != '':
+                options[2] = answer
+
+            answer = prompt('Введите название таблицы в базе данных, в которую хотите сохранить продукты: ') # Name of table in db
+            if answer != '':
+                options[3] = answer
+        else:
+            options[2] = prompt('Введите адрес магазина: ') # Adress of store
+
+        print()
+        answer = prompt('Начинаем парсинг или желаете что-то изменить? (программа начнет работу с выбора магазина) [y/n]: ')
+        if answer.lower() == 'y':
+            break
+
     return options
 
 
