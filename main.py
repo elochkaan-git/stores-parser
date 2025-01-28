@@ -1,4 +1,5 @@
 from selenium import webdriver
+from prompt_toolkit import prompt
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.by import By
@@ -14,6 +15,7 @@ import logging
 import multiprocessing
 import traceback
 import sys
+import os
 
 start = time.time()
 def logger_initialization(logger: logging.Logger) -> None:
@@ -38,8 +40,10 @@ def load_urls(path: str) -> list[str]:
         log.debug(f'Загружены ссылки из {path}')
         return json.load(file)
 
-def split_list(lst, n):
+
+def split_list(dict, n):
     """Разбивает список lst на n примерно равных частей."""
+    lst = list(dict.values())
     avg = len(lst) / float(n)
     out = []
     last = 0.0
@@ -167,17 +171,15 @@ def main(args: typing.Tuple[list[str], str]) -> typing.Tuple[str, float, str, fl
         return results
 
 
-if __name__ == "__main__":
-    log = logging.getLogger('parser_logger')
-    logger_initialization(log)
-    number_of_processes = int(sys.argv[1])
-    urls = split_list(load_urls(sys.argv[2]), number_of_processes)
+def start_processes(options: list[int, str, str, str]) -> None:
+    number_of_processes = options[0]
+    urls = split_list(load_urls(options[1]), number_of_processes)
     queue = multiprocessing.Queue()
 
-    dbwriter = multiprocessing.Process(target=database_writer, args=(queue, sys.argv[4],))
+    dbwriter = multiprocessing.Process(target=database_writer, args=(queue, options[3],))
     dbwriter.start()
 
-    args = [(part_of_urls, sys.argv[3]) for part_of_urls in urls]
+    args = [(part_of_urls, options[2]) for part_of_urls in urls]
     with multiprocessing.Pool(processes=number_of_processes) as pool:
         for result in pool.imap(main, args):
             for value in result:
@@ -186,3 +188,22 @@ if __name__ == "__main__":
     queue.put(None)
     dbwriter.join()
     log.info(f"Время выполнения составило {time.time() - start} секунд")
+
+
+def menu() -> list[int, str, str, str]:
+    
+    options = [1, '', '', 'Products']
+
+    os.system('clear')
+    options[0] = int(prompt('Введите количество процессов (по умолчанию 1): ')) # Number of processes
+    options[1] = prompt('Введите путь до ссылок: ') # Path to urls
+    options[2] = prompt('Введите адрес магазина: ') # Adress of store
+    options[3] = prompt('Введите название таблицы в базе данных, в которую хотите сохранить продукты: ') # Name of table in db
+    return options
+
+
+if __name__ == "__main__":
+    log = logging.getLogger('parser_logger')
+    logger_initialization(log)
+    start_processes(menu())
+    
