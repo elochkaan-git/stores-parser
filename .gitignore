@@ -8,3 +8,4 @@ parser.log
 products.db
 pyvenv.cfg
 test.py
+products.db-journal

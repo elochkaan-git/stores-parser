@@ -100,7 +100,7 @@ def database_writer(queue: multiprocessing.Queue, name_of_table: str) -> None:
     connection.close()
 
 
-def adress_setup(adress: str, driver: webdriver.Firefox) -> None:
+def adress_setup_yarcheplus(adress: str, driver: webdriver.Firefox) -> None:
     driver.get("https://yarcheplus.ru/")
 
     WebDriverWait(driver, 20).until(
