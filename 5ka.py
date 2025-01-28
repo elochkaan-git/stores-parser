@@ -111,11 +111,11 @@ def adress_setup(adress: str, driver: webdriver.Firefox) -> None:
         adress_input = WebDriverWait(driver, 20).until(
             ec.element_to_be_clickable((By.XPATH, '/html/body/div[3]/div[3]/div/section/div/div[2]/div/div[2]/div/input'))
         )
-        for letter in 'Томск, Красноармейская улица, 114':
+        for letter in adress:
             adress_input.send_keys(letter)
 
         WebDriverWait(driver, 20).until(
-            ec.element_to_be_clickable((By.XPATH, '//p[contains(text(), "Красноармейская улица, 114")]'))
+            ec.element_to_be_clickable((By.XPATH, f'//p[contains(text(), "Красноармейская улица, 114")]'))
         ).click()
 
         button_accept = WebDriverWait(driver, 20).until(
@@ -134,6 +134,7 @@ def adress_setup(adress: str, driver: webdriver.Firefox) -> None:
 def scraping(driver: webdriver.Firefox, urls: typing.List[str]) -> typing.Tuple[str, float, str, float, float, str, str]:
     time.sleep(3)
     log.info('Начинаем обрабатывать страницы')
+    log.debug(f'Текущий адрес: {driver.find_element(By.XPATH, '//p[@class="chakra-text fyOFNehN- SdFzIDV1- css-15mul6p"]').text}')
     for url in urls:
         log.debug(f'Процесс {multiprocessing.current_process().pid} обрабатывает {url}')
         driver.get(url)
@@ -164,7 +165,7 @@ def scraping(driver: webdriver.Firefox, urls: typing.List[str]) -> typing.Tuple[
             yield (name, value, unit, rating, cost, link, "Пятерочка")
 
 
-def main(urls: list[str], adress: str) -> typing.Tuple[str, float, str, float, float, str, str]:
+def main(args: typing.Tuple[list[str], str]) -> typing.Tuple[str, float, str, float, float, str, str]:
     log.info(f'Запуск процесса {multiprocessing.current_process().pid}')
     results = []
     try:
@@ -186,14 +187,14 @@ def main(urls: list[str], adress: str) -> typing.Tuple[str, float, str, float, f
 if __name__ == "__main__":
     log = logging.getLogger('parser_logger')
     logger_initialization(log)
-    number_of_processes = int(sys.argv[1])
-    urls = split_list(load_urls(sys.argv[2]), number_of_processes)
+    number_of_processes = int(1)
+    urls = split_list(load_urls('test_urls1.json'), number_of_processes)
     queue = multiprocessing.Queue()
 
     dbwriter = multiprocessing.Process(target=database_writer, args=(queue,))
     dbwriter.start()
 
-    args = [(part_of_urls, sys.argv[3]) for part_of_urls in urls]
+    args = [(part_of_urls, 'Томск, Красноармейская улица, 114') for part_of_urls in urls]
     with multiprocessing.Pool(processes=number_of_processes) as pool:
         for result in pool.imap(main, args):
             for value in result:
