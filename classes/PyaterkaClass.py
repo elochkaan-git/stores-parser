@@ -61,13 +61,14 @@ class PyaterkaParser (BaseParser):
 
             for item in soup.select("[class='chakra-stack KnkuqE3h- fLmfW7LE- css-8g8ihq']"):
                 name = item.find("p", class_="chakra-text SdLEFc2B- css-1jdqp4k").text
-                value, unit = float(re.sub(r'\D', '', item.find("p", class_="chakra-text hPKYUDdM- css-15thl77").text.rsplit(' ', 1)[0])),\
-                            item.find("p", class_="chakra-text hPKYUDdM- css-15thl77").text.rsplit(' ', 1)[1]
+                temp = item.find("p", class_="chakra-text hPKYUDdM- css-15thl77").text.replace(',', '.').split(' ')
+                temp = [i for i in temp if i not in ['Цена', 'за']]
+                value, unit = float(temp[0]), temp[1]
 
                 if unit in ['г', 'мл']:
                     value, unit = value / 1000, 'кг' if unit == 'г' else 'л'
 
-                link = self.url_of_store + item.find("a", class_="chakra-link xlSVIYdp- css-13jvj27").get('href')
+                link = 'https://5ka.ru' + item.find("a", class_="chakra-link xlSVIYdp- css-13jvj27").get('href')
                 try:
                     rating = item.find("p", class_="chakra-text o1tGK2uB- css-1jdqp4k").text
                 except:
