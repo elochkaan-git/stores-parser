@@ -1,29 +1,25 @@
-from selenium import webdriver
 from simple_term_menu import TerminalMenu
 from prompt_toolkit import prompt
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
-from bs4 import BeautifulSoup as bs
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 import sqlite3
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 import json
 import time
-import logging
 import multiprocessing
-import traceback
 import sys
 import os
-import re
 
-YARCHEPLUS = 1
-PYATERKA = 2
+from classes import YarcheplusClass,\
+                    PyaterkaClass
+from classes.BaseClass import log
+
+STORES = {
+    0 : YarcheplusClass.YarcheParser,
+    1 : PyaterkaClass.PyaterkaParser,
+}
+
 WARNING = ('NOTE: Обязательный параметр!',
            'Адрес задается в формате "Город, улица, номер дома"',
            'Но будьте внимательны, адрес у Пятерочки очень чувствительный',
@@ -37,22 +33,6 @@ MESSAGE = 'NOTE: если вы не хотите менять какой-то п
 
 
 start = time.time()
-def logger_initialization(logger: logging.Logger) -> None:
-    logger.setLevel(logging.DEBUG)
-    
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-
-    file_handler = logging.FileHandler('parser.log')
-    file_handler.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
-
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-
 
 def load_urls(path: str) -> Dict[str, str]:
     with open(path, 'r') as file:
@@ -60,7 +40,7 @@ def load_urls(path: str) -> Dict[str, str]:
         return json.load(file)
 
 
-def split_list(dict: Dict[str, str], n: int) -> list[list[str], ...]:
+def split_list(dict: Dict[str, str], n: int) -> List[List[str], ...]:
     """Разбивает список lst на n примерно равных частей."""
     lst = list(dict.values())
     avg = len(lst) / float(n)
@@ -72,16 +52,6 @@ def split_list(dict: Dict[str, str], n: int) -> list[list[str], ...]:
         last += avg
 
     return out
-
-
-def driver_initialization() -> webdriver.Firefox:
-    log.info(f'В процессе {multiprocessing.current_process().pid} запускается браузер')
-    driver_options = Options()
-    driver_options.add_argument("--headless")
-    driver_service = Service(executable_path="/usr/bin/geckodriver")
-    driver = webdriver.Firefox(options=driver_options, service=driver_service)
-    log.info(f'Браузер настроен и запущен в процессе {multiprocessing.current_process().pid}')
-    return driver
 
 
 def database_writer(queue: multiprocessing.Queue, name_of_table: str) -> None:
@@ -117,156 +87,19 @@ def database_writer(queue: multiprocessing.Queue, name_of_table: str) -> None:
     connection.close()
 
 
-def adress_setup_yarcheplus(adress: str, driver: webdriver.Firefox) -> None:
-    driver.get("https://yarcheplus.ru/")
-
-    WebDriverWait(driver, 20).until(
-        ec.element_to_be_clickable((By.XPATH, '//*[@class="a8MJ8NOjn e8MJ8NOjn aXjHckwsA t8MJ8NOjn n8MJ8NOjn l8MJ8NOjn"]'))
-    ).click()
-
-    address_input = WebDriverWait(driver, 20).until(
-        ec.presence_of_element_located((By.XPATH, '//*[@id="receivedAddress"]'))
-    )
-    address_input.send_keys(adress)
-    address_input.send_keys(Keys.ENTER)
-
-    WebDriverWait(driver, 20).until(
-        ec.element_to_be_clickable((By.XPATH, '//button[@class="atLAAl6Nb gtLAAl6Nb"]'))
-    ).click()
-
-    log.info(f'Адрес установлен для браузера в процессе {multiprocessing.current_process().pid}')
-
-
-def adress_setup_5ka(adress: str, driver: webdriver.Firefox) -> None:
-    driver.get("https://5ka.ru/catalog/")
-
+def use_parser (args: Tuple[str, List[str], int]) -> List[Tuple[str, float, str, float, float, str, str]]:
     try:
-        WebDriverWait(driver, 20).until(
-            ec.element_to_be_clickable((By.XPATH, "//*[@class='chakra-button k6J7twGM- css-12yf9td']"))
-        )
-
-        WebDriverWait(driver, 20).until(
-            ec.element_to_be_clickable((By.XPATH, "//*[@class='chakra-button k6J7twGM- css-12yf9td']"))
-        ).click()
-
-        adress_input = WebDriverWait(driver, 20).until(
-            ec.element_to_be_clickable((By.XPATH, '/html/body/div[3]/div[3]/div/section/div/div[2]/div/div[2]/div/input'))
-        )
-        for letter in adress:
-            adress_input.send_keys(letter)
-
-        adress = adress.split(' ', 1)[1]
-        WebDriverWait(driver, 20).until(
-            ec.element_to_be_clickable((By.XPATH, f'//p[contains(text(), "{adress}")]'))
-        ).click()
-
-        button_accept = WebDriverWait(driver, 20).until(
-            ec.element_to_be_clickable((By.XPATH, '//button[@class="chakra-button nRbDkUwL- css-j9bhfa"]'))
-        )
-        button_accept.click()
-    except Exception as e:
-        driver.quit()
-        log.error(f'В процессе {multiprocessing.current_process().pid} произошла ошибка - адресс не установлен. Пожалуйста, перезапустите программу')
-        log.error(traceback.format_exc())
-        sys.exit()
-
-    log.info(f'Адрес установлен для браузера в процессе {multiprocessing.current_process().pid}')
+        results = []
+        parser = STORES[args[2]](args[0], args[1])
+        parser.adress_setup()
+        for result in parser.scraping():
+            results.append(result)
+    finally:
+        parser.close()
+    return results
 
 
-def scraping_yarcheplus(driver: webdriver.Firefox, urls: list[str]) -> Tuple[str, float, str, float, float, str, str]:
-    log.info('Начинаем обрабатывать страницы')
-    WebDriverWait(driver, 20).until(
-        ec.presence_of_element_located((By.XPATH, '//*[@class="loFy5xub4 WoFy5xub4 coFy5xub4"]'))
-    )
-    log.debug(f'Текущий адрес: {driver.find_element(By.XPATH, '//*[@class="loFy5xub4 WoFy5xub4 coFy5xub4"]').text + \
-                                driver.find_element(By.XPATH, '//*[@class="loFy5xub4 dXjHckwsA WoFy5xub4"]').text}')
-    for url in urls:
-        try:
-            log.debug(f'Процесс {multiprocessing.current_process().pid} обрабатывает {url}')
-            driver.get(url)
-            soup = bs(driver.page_source, 'html.parser')
-
-            for item in soup.select("[class*='akn2Ylc1S bkn2Ylc1S']"):
-                name = item.find("div", class_="doFy5xub4 jkn2Ylc1S ToFy5xub4 bBoFy5xub4 coFy5xub4").text
-                value, unit = float(item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').rsplit(' ', 1)[0]),\
-                            item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').rsplit(' ', 1)[1]
-
-                if unit in ['г', 'мл']:
-                    value, unit = value / 1000, 'кг' if unit == 'г' else 'л'
-
-                link = "https://yarcheplus.ru" + item.find("a", class_="lkn2Ylc1S").get('href')
-                try:
-                    rating = item.find("div", class_="ioFy5xub4 e773bOrUb UoFy5xub4 bAoFy5xub4 noFy5xub4 aoFy5xub4").text
-                except:
-                    rating = None
-                cost = item.select("[class*='cwDg02i5o LoFy5xub4 byoFy5xub4 aoFy5xub4']")[0].text
-
-                log.debug(f'{(name, value, unit, rating, cost, link, "Ярче!")} переданы в базу данных')
-                yield (name, value, unit, rating, cost, link, "Ярче!")
-        except:
-            log.error(f'В процессе {multiprocessing.current_process().pid} возникла ошибка при обработке {url}')
-            log.error(traceback.format_exc())
-
-
-def scraping_5ka(driver: webdriver.Firefox, urls: List[str]) -> Tuple[str, float, str, float, float, str, str]:
-    time.sleep(3)
-    log.info('Начинаем обрабатывать страницы')
-    log.debug(f'Текущий адрес: {driver.find_element(By.XPATH, '//p[@class="chakra-text fyOFNehN- SdFzIDV1- css-15mul6p"]').text}')
-    for url in urls:
-        log.debug(f'Процесс {multiprocessing.current_process().pid} обрабатывает {url}')
-        driver.get(url)
-        try:
-            WebDriverWait(driver, 20).until(
-                ec.presence_of_element_located((By.XPATH, '//div[@class="chakra-stack KnkuqE3h- fLmfW7LE- css-8g8ihq"]'))
-            )
-        except:
-            log.warning(f'В данный момент сайт {url} недоступен или на нем отсутствуют товары')
-        soup = bs(driver.page_source, 'html.parser')
-
-        for item in soup.select("[class='chakra-stack KnkuqE3h- fLmfW7LE- css-8g8ihq']"):
-            name = item.find("p", class_="chakra-text SdLEFc2B- css-1jdqp4k").text
-            value, unit = float(re.sub(r'\D', '', item.find("p", class_="chakra-text hPKYUDdM- css-15thl77").text.rsplit(' ', 1)[0])),\
-                          item.find("p", class_="chakra-text hPKYUDdM- css-15thl77").text.rsplit(' ', 1)[1]
-
-            if unit in ['г', 'мл']:
-                value, unit = value / 1000, 'кг' if unit == 'г' else 'л'
-
-            link = url[:-1] + item.find("a", class_="chakra-link xlSVIYdp- css-13jvj27").get('href')
-            try:
-                rating = item.find("p", class_="chakra-text o1tGK2uB- css-1jdqp4k").text
-            except:
-                rating = None
-            cost = float(re.sub(r'\D', '', item.select("div.j_IdgaDq-.css-k008qs p")[0].text) + '.' + re.sub(r'\D', '', item.select("div.j_IdgaDq-.css-k008qs p")[1].text))
-
-            log.debug(f'{(name, value, unit, rating, cost, link, "Пятерочка")} переданы в базу данных')
-            yield (name, value, unit, rating, cost, link, "Пятерочка")
-
-
-def worker(args: Tuple[list[str], str, int]) -> Tuple[str, float, str, float, float, str, str]:
-    log.info('Программа запускается')
-    results = []
-    try:
-        browser = driver_initialization()
-        if args[2] == YARCHEPLUS:
-            adress_setup_yarcheplus(args[1], browser)
-            for action in scraping_yarcheplus(browser, args[0]):
-                results.append(action)
-        elif args[2] == PYATERKA:
-            adress_setup_5ka(args[1], browser)
-            for action in scraping_5ka(browser, args[0]):
-                results.append(action)
-        
-    except:
-        log.error(f'Браузер отключен, процесс {multiprocessing.current_process().pid} завершен с ошибкой')
-        log.error(traceback.format_exc())
-        browser.quit()
-    else:
-        browser.quit()
-        log.info(f'Браузер отключен, процесс {multiprocessing.current_process().pid} завершен без ошибок')
-        return results
-
-
-def main(options: Dict[str, str]) -> None:
+def main(options: Dict[str, Union[str, int, Dict[str, str]]]) -> None:
     number_of_processes = int(options['number_of_processes'])
     urls = split_list(options['selected_urls'], number_of_processes)
     if [] in urls:
@@ -277,9 +110,9 @@ def main(options: Dict[str, str]) -> None:
     dbwriter = multiprocessing.Process(target=database_writer, args=(queue, options['name_of_table'],))
     dbwriter.start()
 
-    args = [(part_of_urls, options['adress'], int(options['store_id'])) for part_of_urls in urls]
+    args = [(options['adress'], part_of_urls, options['store_id']) for part_of_urls in urls]
     with multiprocessing.Pool(processes=number_of_processes) as pool:
-        for result in pool.imap(worker, args):
+        for result in pool.imap(use_parser, args):
             for value in result:
                 queue.put(value)
 
@@ -322,7 +155,7 @@ def menu() -> list[int, str, str, str, int]:
                 'path_to_urls' : './urls1.json',
                 'adress' : '',
                 'name_of_table' : 'Products_yarcheplus',
-                'store_id' : str(YARCHEPLUS),
+                'store_id' : 0,
                 'selected_urls' : {}
             }
         elif int(store) == 2:
@@ -331,7 +164,7 @@ def menu() -> list[int, str, str, str, int]:
                 'path_to_urls' : './test_urls1.json',
                 'adress' : '',
                 'name_of_table' : 'Products_5ka',
-                'store_id' : str(PYATERKA),
+                'store_id' : 1,
                 'selected_urls' : {}
             }
 
@@ -385,6 +218,4 @@ def menu() -> list[int, str, str, str, int]:
 
 
 if __name__ == "__main__":
-    log = logging.getLogger('parser_logger')
-    logger_initialization(log)
     main(menu())

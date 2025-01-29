@@ -9,5 +9,5 @@ products.db
 pyvenv.cfg
 test.py
 products.db-journal
-5ka.py
 .obsidian
+classes/__pycache__
