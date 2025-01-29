@@ -39,18 +39,20 @@ class YarcheParser (BaseParser):
 
                 for item in soup.select("[class*='akn2Ylc1S bkn2Ylc1S']"):
                     name = item.find("div", class_="doFy5xub4 jkn2Ylc1S ToFy5xub4 bBoFy5xub4 coFy5xub4").text
-                    value, unit = float(item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').rsplit(' ', 1)[0]),\
-                                item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').rsplit(' ', 1)[1]
+                    temp = item.find("div", class_="eoFy5xub4 rkn2Ylc1S RoFy5xub4 bBoFy5xub4 aoFy5xub4").text.replace('\xa0', ' ').replace(',', '.').rsplit(' ', 1)
+                    value, unit = float(temp[0]), temp[1]
 
                     if unit in ['г', 'мл']:
                         value, unit = value / 1000, 'кг' if unit == 'г' else 'л'
+                    if 'Яйцо' in name:
+                        value *= 10
 
                     link = self.url_of_store + item.find("a", class_="lkn2Ylc1S").get('href')
                     try:
                         rating = item.find("div", class_="ioFy5xub4 e773bOrUb UoFy5xub4 bAoFy5xub4 noFy5xub4 aoFy5xub4").text
                     except:
                         rating = None
-                    cost = item.select("[class*='cwDg02i5o LoFy5xub4 byoFy5xub4 aoFy5xub4']")[0].text
+                    cost = float(item.select("[class*='cwDg02i5o LoFy5xub4 byoFy5xub4 aoFy5xub4']")[0].text.split(' ')[0].replace(',', '.'))
 
                     log.debug(f'{(name, value, unit, rating, cost, link, "Ярче!")} переданы в базу данных')
                     yield (name, value, unit, rating, cost, link, "Ярче!")
