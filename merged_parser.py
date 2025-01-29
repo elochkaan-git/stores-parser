@@ -40,7 +40,7 @@ def load_urls(path: str) -> Dict[str, str]:
         return json.load(file)
 
 
-def split_list(dict: Dict[str, str], n: int) -> List[List[str], ...]:
+def split_list(dict: Dict[str, str], n: int) -> list[List[str], ...]:
     """Разбивает список lst на n примерно равных частей."""
     lst = list(dict.values())
     avg = len(lst) / float(n)
@@ -132,11 +132,11 @@ def menu() -> list[int, str, str, str, int]:
     table.add_column('Параметры запуска по умолчанию')
 
     table.add_row('1', 'Ярче', f'''Количество процессов: 3
-Путь до ссылок: {os.getcwd() + "/urls1.json"}
+Путь до ссылок: {os.getcwd() + "/yarche_urls.json"}
 Адрес магазина: {None}
 Название таблицы: Products_yarcheplus''')
     table.add_row('2', 'Пятерочка', f'''Количество процессов: 3
-Путь до ссылок: {os.getcwd() + "/test_urls1.json"}
+Путь до ссылок: {os.getcwd() + "/pyaterka_urls.json"}
 Адрес магазина: {None}
 Название таблицы: Products_5ka''')
 
@@ -152,7 +152,7 @@ def menu() -> list[int, str, str, str, int]:
         elif int(store) == 1:
             options = {
                 'number_of_processes' : '3',
-                'path_to_urls' : './urls1.json',
+                'path_to_urls' : './yarche_urls.json',
                 'adress' : '',
                 'name_of_table' : 'Products_yarcheplus',
                 'store_id' : 0,
@@ -161,7 +161,7 @@ def menu() -> list[int, str, str, str, int]:
         elif int(store) == 2:
             options = {
                 'number_of_processes' : '3',
-                'path_to_urls' : './test_urls1.json',
+                'path_to_urls' : './pyaterka_urls.json',
                 'adress' : '',
                 'name_of_table' : 'Products_5ka',
                 'store_id' : 1,
